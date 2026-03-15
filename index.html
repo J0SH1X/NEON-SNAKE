@@ -367,6 +367,220 @@
             orderBy,
             limit,
             getDocs,
+            deleteDoc,
+            doc,
+            setDoc
+        } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDJF5PLnlWghvf1Tev7Ibiy6lDAqZhWc4Q",
+            authDomain: "rainbow-snake-5d7ac.firebaseapp.com",
+            projectId: "rainbow-snake-5d7ac",
+            messagingSenderId: "728021400110",
+            appId: "1:728021400110:web:c2bd1759d718fbe6b5bdbf"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        // 🔓 Global verfügbar machen
+        window.app = app;
+        window.db = db;
+        window.fs = { collection, addDoc, query, orderBy, limit, getDocs, deleteDoc, doc, setDoc };
+    </script>
+
+    <script type="module">
+
+        import { getMessaging, getToken, onMessage }
+            from "https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging.js";
+
+        const messaging = getMessaging(window.app);
+
+        // GLOBAL MACHEN
+        window.messaging = messaging;
+        window.getToken = getToken;
+
+    </script>
+
+</head>
+
+<body>
+
+
+    <!-- 🟣 STARTSCREEN -->
+    <div id="start-screen" class="screen active">
+        <div class="start-layout vertical">
+
+            <h1 class="neon-title">NEON SNAKE</h1>
+
+            <button id="start-btn">▶ START GAME</button>
+
+            <h3 class="start-highscore-title">Top 100</h3>
+            <ol id="highscore-list"></ol>
+
+        </div>
+    </div>
+
+    <!-- 🟢 GAME SCREEN -->
+    <div id="game-screen" class="screen">
+        <div class="game-wrapper">
+            <canvas id="canvas" width="480" height="480"></canvas>
+        </div>
+
+        <div id="name-input" style="display:none;">
+            <p>Neuer Highscore! Name eingeben:</p>
+            <input type="text" id="player-name" maxlength="12" />
+            <button onclick="saveHighscore()">OK</button>
+        </div>
+
+        <!-- 👆 Swipe Area -->
+        <div id="swipe-area">
+            <h2>Swipe to move</h2>
+
+        </div>
+    </div>
+
+    <script>
+        let canvas = document.getElementById('canvas');
+        let ctx = canvas.getContext('2d');
+        let rows = 30; // zeilen im Canvas
+        let cols = 30; // spalten im Canvas
+        let snake = [{
+            x: 26, y: 3 // Die Schlange startet immer an diesen Koordinaten
+        },
+        ];
+        let food;
+        let cellWidth = canvas.width / cols;
+        let cellHeight = canvas.height / rows;
+        let direction = "LEFT";
+        let score = 0;
+        let gameOver = false;
+        let gameInterval;
+        let eatsound = new Audio('eat.mp3');
+        eatsound.volume = 0.1;
+        let bgMusic = new Audio('Tetris.mp3');
+        bgMusic.loop = true;
+        bgMusic.volume = 0.4;
+        let musicOn = true;
+        let musicUnlocked = false;
+        let nextDirection = "LEFT";
+        let baseSpeed = 200;      // Startgeschwindigkeit (ms)
+        let speedStep = 10;      // wie viel schneller (ms)
+        let minSpeed = 60;       // Maximum-Speed (Untergrenze)
+        let speedLevel = 0; // wie oft wir schneller geworden sind
+        let levelUpSound = new Audio('levelup.mp3');
+        levelUpSound.volume = 0.4;
+        let gameOverSound = new Audio('gameover.mp3');
+        gameOverSound.volume = 0.5;
+        let superFoodSound = new Audio('superfood.mp3');
+        superFoodSound.volume = 0.3;
+        let rareFoodSound = new Audio("rarefood.mp3");
+        rareFoodSound.volume = 0.6;
+        let touchStartX = 0;
+        let touchStartY = 0;
+        let touchEndX = 0;
+        let touchEndY = 0;
+        let gameStarted = false;
+        let growSegments = 0;
+        let tongueTimer = 0; // wie viele Frames die Zunge sichtbar ist
+        let levelUpFlash = 0; // Frames für Level-Up Effekt
+        let vibrationUnlocked = false;
+        let superFood = null;
+        let globalHighscores = [];
+        let gameOverAlpha = 0;
+        let rareSuperFood = null;
+        let rareSuperFoodExpiresAt = 0;
+        let currentPushToken = null;
+
+
+
+        window.addEventListener('load', () => {
+            loadGlobalHighscores();
+        });
+
+        const SUPERFOOD_CHANCE = 0.30;  // 25 % Chance nach normalem Essen
+        let rainbowMode = false;
+        let rainbowExpiresAt = 0;
+        let superFoodExpiresAt = 0;
+
+
+        let silentAudio = new Audio();
+        silentAudio.src = "data:audio/mp3;base64,//uQxAAAAAAAAAAAAAAAAAAAAAA==";
+        silentAudio.loop = true;
+        [eatsound, bgMusic, levelUpSound, gameOverSound, rareFoodSound, superFoodSound].forEach(a => {
+            a.preload = 'auto';
+            a.playsInline = true;     // 🔑 iOS FIX
+            a.muted = false;
+        });
+
+        placefood(); // führt die aktion food hinzufügen aus
+
+
+        document.addEventListener('keydown', keyDown);
+
+        const swipeArea = document.getElementById('swipe-area');
+
+        swipeArea.addEventListener('touchstart', e => {
+            e.preventDefault();
+            const t = e.touches[0];
+            touchStartX = t.clientX;
+            touchStartY = t.clientY;
+        }, { passive: false });
+
+        swipeArea.addEventListener('touchend', e => {
+            e.preventDefault();
+
+            const t = e.changedTouches[0];
+            touchEndX = t.clientX;
+            touchEndY = t.clientY;
+
+            const dx = touchEndX - touchStartX;
+            const dy = touchEndY - touchStartY;
+
+            const isTap = Math.abs(dx) < 10 && Math.abs(dy) < 10;
+
+            // 🔁 TAP = Restart
+            if (gameOver && isTap) {
+                restartGame();
+                return;
+            }
+
+            // 👉 SWIPE = Bewegung
+            if (!gameOver) {
+                handleSwipe();
+            }
+        }, { passive: false });
+
+
+        canvas.addEventListener('click', () => {
+            if (gameOver) restartGame();
+        });
+
+
+
+        async function enablePush() {
+
+            try {
+                const registration = await navigator.serviceWorker.ready;
+                const token = await window.getToken(window.messaging, {
+                    vapidKey: "BGmMjTZy_UVX95FNDrHFHw-89uan1oyiqUTm8dUVOYIaaysn7GP7tYixLSEnik_2xI3ShHm1a41nq50keYTZbQQ",
+                    serviceWorkerRegistration: registration
+                });
+
+                currentPushToken = token;
+
+                console.log("Push Token:", token);
+
+                <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import {
+            getFirestore,
+            collection,
+            addDoc,
+            query,
+            orderBy,
+            limit,
+            getDocs,
             deleteDoc
         } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
@@ -576,6 +790,13 @@
                         created: Date.now()
                     }
                 );
+
+            } catch (err) {
+                console.log("Push Permission verweigert:", err);
+            }
+        }
+
+
 
             } catch (err) {
                 console.log("Push Permission verweigert:", err);
