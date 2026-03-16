@@ -21,7 +21,7 @@ exports.highscoreAlert = onDocumentCreated(
         const tokens = [];
 
         tokensSnapshot.forEach(doc => {
-            tokens.push(doc.id);   // 🔥 TOKEN IST JETZT DIE DOC ID
+            tokens.push(doc.data().token);
         });
 
         if (tokens.length === 0) {
