@@ -573,21 +573,12 @@
 
                 console.log("Push Token:", token);
 
-                let deviceId = localStorage.getItem("deviceId");
-
-                if (!deviceId) {
-                    deviceId = crypto.randomUUID();
-                    localStorage.setItem("deviceId", deviceId);
-                }
-
                 await window.fs.setDoc(
-                    window.fs.doc(window.db, "tokens", deviceId),
+                    window.fs.doc(window.db, "tokens", token),
                     {
-                        token: token,
                         updated: Date.now()
                     }
                 );
-
             } catch (err) {
 
                 console.log("Push Permission verweigert:", err);
