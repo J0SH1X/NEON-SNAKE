@@ -7,69 +7,139 @@ admin.initializeApp();
 setGlobalOptions({ region: "europe-west3" });
 
 exports.highscoreAlert = onDocumentCreated(
-    "highscores/{scoreId}",
-    async (event) => {
+  "highscores/{scoreId}",
+  async (event) => {
 
-        if (!event.data) return;
+    if (!event.data) return;
 
-        const data = event.data.data();
-        const player = data.name;
-        const score = data.score;
+    const data = event.data.data();
+    const player = data.name;
+    const score = data.score;
+    const playerToken = data.token;
 
-        if (score < 50) {
-            console.log("Score too low for push");
-            return;
+    const db = admin.firestore();
+
+    // 🔎 aktuelle Top 10 laden
+    const topQuery = await db
+      .collection("highscores")
+      .orderBy("score", "desc")
+      .limit(10)
+      .get();
+
+    const topScores = topQuery.docs.map(doc => doc.data().score);
+
+    // ❌ Score nicht gut genug → keine Push
+    if (topScores.length === 10 && score < topScores[topScores.length - 1]) {
+      console.log("Score not high enough for push");
+      return;
+    }
+
+    // 🏆 Rang berechnen
+    let rank = topScores.findIndex(s => score >= s);
+
+    if (rank === -1) {
+      rank = topScores.length;
+    }
+
+    let messageBody = `${player} erzielte ${score} Punkte!`;
+
+    if (rank === 0) {
+      messageBody = `🔥 NEW RECORD! ${player} erzielte ${score} Punkte!`;
+    }
+    else if (rank === 1) {
+      messageBody = `⚡ Almost Champion! ${player} erzielte ${score} Punkte!`;
+    }
+    else if (rank === 2) {
+      messageBody = `🏆 Top 3! ${player} erzielte ${score} Punkte!`;
+    }
+
+    // 📲 alle Tokens laden
+    const tokensSnapshot = await db.collection("tokens").get();
+
+    const tokens = [];
+
+    tokensSnapshot.forEach(doc => {
+      tokens.push(doc.id);
+    });
+
+    if (tokens.length === 0) {
+      console.log("No tokens found");
+      return;
+    }
+
+    // 📤 Leaderboard Push
+    const message = {
+      data: {
+        title: "🐍NEON SNAKE🐍",
+        body: messageBody
+      },
+      tokens: tokens
+    };
+
+    const response = await admin.messaging().sendEachForMulticast(message);
+
+    console.log("Push sent:", response.successCount, "/", tokens.length);
+
+    // 🧹 ungültige Tokens entfernen
+    response.responses.forEach((resp, idx) => {
+
+      if (!resp.success) {
+
+        const error = resp.error.code;
+
+        if (
+          error === "messaging/registration-token-not-registered" ||
+          error === "messaging/invalid-registration-token"
+        ) {
+
+          const badToken = tokens[idx];
+
+          console.log("Removing invalid token:", badToken);
+
+          db.collection("tokens")
+            .doc(badToken)
+            .delete();
         }
+      }
 
-        const db = admin.firestore();
-        const tokensSnapshot = await db.collection("tokens").get();
+    });
 
-        const tokens = [];
+    // ⚔️ Rival System
+    // Spieler benachrichtigen, deren Score geschlagen wurde
 
-        tokensSnapshot.forEach(doc => {
-            tokens.push(doc.id);
-        });
+    const beatenQuery = await db
+      .collection("highscores")
+      .where("score", "<", score)
+      .limit(5)
+      .get();
 
-        if (tokens.length === 0) {
-            console.log("No tokens found");
-            return;
-        }
+    const rivalTokens = [];
 
-        const message = {
-            data: {
-                title: "NEON SNAKE",
-                body: `${player} reached ${score} points!`
-            },
-            tokens: tokens
-        };
+    beatenQuery.forEach(doc => {
 
-        const response = await admin.messaging().sendEachForMulticast(message);
+      const rival = doc.data();
 
-        console.log("Push sent:", response.successCount);
+      if (rival.token && rival.token !== playerToken) {
+        rivalTokens.push(rival.token);
+      }
 
-        response.responses.forEach((resp, idx) => {
+    });
 
-            if (!resp.success) {
+    if (rivalTokens.length > 0) {
 
-                const error = resp.error.code;
+      const rivalMessage = {
+        data: {
+          title: "⚠️ Dein Score wurde geschlagen!",
+          body: `${player} hat dich mit ${score} Punkten überholt!`
+        },
+        tokens: rivalTokens
+      };
 
-                if (
-                    error === "messaging/registration-token-not-registered" ||
-                    error === "messaging/invalid-registration-token"
-                ) {
+      await admin.messaging().sendEachForMulticast(rivalMessage);
 
-                    const badToken = tokens[idx];
-
-                    db.collection("tokens")
-                        .where("token", "==", badToken)
-                        .get()
-                        .then(snapshot => {
-                            snapshot.forEach(doc => doc.ref.delete());
-                        });
-                }
-            }
-
-        });
+      console.log("Rival notifications sent:", rivalTokens.length);
 
     }
+
+  }
 );
