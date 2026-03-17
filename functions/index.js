@@ -23,13 +23,13 @@ exports.highscoreAlert = onDocumentCreated(
     const topQuery = await db
       .collection("highscores")
       .orderBy("score", "desc")
-      .limit(10)
+      .limit(100)
       .get();
 
     const topScores = topQuery.docs.map(doc => doc.data().score);
 
     // ❌ Score nicht gut genug → keine Push
-    if (topScores.length === 10 && score < topScores[topScores.length - 1]) {
+    if (topScores.length === 100 && score < topScores[topScores.length - 1]) {
       console.log("Score not high enough for push");
       return;
     }
@@ -110,7 +110,8 @@ exports.highscoreAlert = onDocumentCreated(
     const beatenQuery = await db
       .collection("highscores")
       .where("score", "<", score)
-      .limit(5)
+      .orderBy("score", "desc") // 🔥 wichtig! damit nur die spieler informiert werden die gerade überholt wurden
+      .limit(3)
       .get();
 
     const rivalTokens = [];
