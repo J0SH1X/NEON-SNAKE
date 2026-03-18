@@ -476,6 +476,8 @@
         superFoodSound.volume = 0.3;
         let rareFoodSound = new Audio("rarefood.mp3");
         rareFoodSound.volume = 0.6;
+        let extraFoodSound = new Audio("extrafood.mp3")
+        extraFoodSound.volume = 0.3;
         let touchStartX = 0;
         let touchStartY = 0;
         let touchEndX = 0;
@@ -491,6 +493,7 @@
         let rareSuperFood = null;
         let rareSuperFoodExpiresAt = 0;
         let currentPushToken = null;
+        let extraFood = null;
 
 
 
@@ -498,16 +501,18 @@
             loadGlobalHighscores();
         });
 
-        const SUPERFOOD_CHANCE = 0.30;  // 25 % Chance nach normalem Essen
+        const SUPERFOOD_CHANCE = 0.50;  // 50 % Chance nach normalem Essen
+        const EXTRAFOOD_CHANCE = 0.50;  // 50 % Chance nach normalem Essen
         let rainbowMode = false;
         let rainbowExpiresAt = 0;
         let superFoodExpiresAt = 0;
+        let extraFoodExpiresAt = 0;
 
 
         let silentAudio = new Audio();
         silentAudio.src = "data:audio/mp3;base64,//uQxAAAAAAAAAAAAAAAAAAAAAA==";
         silentAudio.loop = true;
-        [eatsound, bgMusic, levelUpSound, gameOverSound, rareFoodSound, superFoodSound].forEach(a => {
+        [eatsound, bgMusic, levelUpSound, gameOverSound, rareFoodSound, superFoodSound, extraFoodSound].forEach(a => {
             a.preload = 'auto';
             a.playsInline = true;     // 🔑 iOS FIX
             a.muted = false;
@@ -616,6 +621,10 @@
                 drawRareSuperFood(rareSuperFood.x, rareSuperFood.y);
             }
 
+            if (extraFood) {
+                drawextraFood(extraFood.x, extraFood.y);
+            }
+
 
             if (gameOver) {
                 gameOverAlpha = Math.min(1, gameOverAlpha + 0.03);
@@ -702,6 +711,30 @@
             const py = y * cellHeight;
 
             const timeLeft = Math.max(0, superFoodExpiresAt - Date.now());
+            const t = timeLeft / 1000; // Sekunden
+
+            // Puls wird schneller, je weniger Zeit bleibt
+            const pulse = Math.sin(t * (t < 1.5 ? 16 : 8)) * 4;
+
+            ctx.shadowColor = '#ff00ff';
+            ctx.shadowBlur = 20;
+
+            ctx.fillStyle = '#ff00ff';
+            ctx.fillRect(
+                px - pulse / 2,
+                py - pulse / 2,
+                cellWidth - 1 + pulse,
+                cellHeight - 1 + pulse
+            );
+
+            ctx.shadowBlur = 0;
+        }
+
+        function drawExtraFood(x, y) {
+            const px = x * cellWidth;
+            const py = y * cellHeight;
+
+            const timeLeft = Math.max(0, extraFoodExpiresAt - Date.now());
             const t = timeLeft / 1000; // Sekunden
 
             // Puls wird schneller, je weniger Zeit bleibt
@@ -1144,6 +1177,25 @@
             }
         }
 
+        function placeExtraFood() {
+            let valid = false;
+
+            while (!valid) {
+                let x = Math.floor(Math.random() * cols);
+                let y = Math.floor(Math.random() * rows);
+
+                valid =
+                    !snake.some(p => p.x === x && p.y === y) &&
+                    (!food || food.x !== x || food.y !== y);
+
+
+                if (valid) {
+                    superFood = { x, y };
+                    extraFoodExpiresAt = Date.now() + 7000; // ✅ exakt 7 Sekunden
+                }
+            }
+        }
+
         function placeRareSuperFood() {
 
             let valid = false;
@@ -1290,6 +1342,10 @@
                     placeSuperFood();
                 }
 
+                if (!extraFood && Math.random() < EXTRAFOOD_CHANCE) {
+                    placeExtraFood();
+                }
+
                 if (!rareSuperFood && Math.random() < 0.30) {
                     placeRareSuperFood();
                 }
@@ -1317,6 +1373,29 @@
                 // 🔊 Bonus-Feedback (optional)
                 superFoodSound.currentTime = 0;
                 superFoodSound.play();
+
+                // 📳 optional Mini-Buzz
+                if (navigator.vibrate && vibrationUnlocked) {
+                    navigator.vibrate([30, 20, 30]);
+                }
+
+            }
+
+            if (extraFood &&
+                snake[0].x === extraFood.x &&
+                snake[0].y === extraFood.y) {
+
+                score += 30;
+                screenFlash("#ff00ff");
+                scorePop();
+
+                // ❌ KEIN growSegments++
+                extraFood = null;
+
+
+                // 🔊 Bonus-Feedback (optional)
+                extraFoodSound.currentTime = 0;
+                extraFoodSound.play();
 
                 // 📳 optional Mini-Buzz
                 if (navigator.vibrate && vibrationUnlocked) {
@@ -1396,6 +1475,10 @@
 
             if (superFood && Date.now() > superFoodExpiresAt) {
                 superFood = null;
+            }
+
+            if (extraFood && Date.now() > extraFoodExpiresAt) {
+                extraFood = null;
             }
 
 
@@ -1574,6 +1657,8 @@
             // STATE RESET
             superFood = null;
             superFoodExpiresAt = 0;
+            extraFood = 0;
+            extraFoodExpiresAt = 0;
             rainbowMode = false;
             rainbowExpiresAt = 0;
             snake = [{ x: 26, y: 3 }];
