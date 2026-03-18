@@ -1388,8 +1388,8 @@
                 snake[0].y === extraFood.y) {
 
                 score += 30;
-                screenFlash("#ff00ff");
-                scorePop();
+                screenFlash("#00FF00");
+                scorePop30();
 
                 // ❌ KEIN growSegments++
                 extraFood = null;
@@ -1543,6 +1543,29 @@
             pop.style.color = "#ff00ff";
             pop.style.fontSize = "60px";
             pop.style.textShadow = "0 0 20px #ff00ff";
+            pop.style.pointerEvents = "none";
+
+            document.body.appendChild(pop);
+
+            setTimeout(() => {
+                pop.style.transition = "all 0.5s ease";
+                pop.style.top = "30%";
+                pop.style.opacity = "0";
+            }, 50);
+
+            setTimeout(() => pop.remove(), 600);
+        }
+
+        function scorePop30() {
+            const pop = document.createElement("div");
+            pop.innerText = "+30";
+            pop.style.position = "fixed";
+            pop.style.left = "50%";
+            pop.style.top = "40%";
+            pop.style.transform = "translate(-50%, -50%)";
+            pop.style.color = "#00FF00";
+            pop.style.fontSize = "60px";
+            pop.style.textShadow = "0 0 20px #00FF00";
             pop.style.pointerEvents = "none";
 
             document.body.appendChild(pop);
