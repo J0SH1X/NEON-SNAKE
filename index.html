@@ -1186,7 +1186,9 @@
 
                 valid =
                     !snake.some(p => p.x === x && p.y === y) &&
-                    (!food || food.x !== x || food.y !== y);
+                    (!food || food.x !== x || food.y !== y) &&
+                    (!superFood || superFood.x !== x || superFood.y !== y) &&
+                    (!extraFood || extraFood.x !== x || extraFood.y !== y);
 
 
                 if (valid) {
