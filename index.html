@@ -622,7 +622,7 @@
             }
 
             if (extraFood) {
-                drawextraFood(extraFood.x, extraFood.y);
+                drawExtraFood(extraFood.x, extraFood.y);
             }
 
 
@@ -1190,7 +1190,7 @@
 
 
                 if (valid) {
-                    superFood = { x, y };
+                    extraFood = { x, y };
                     extraFoodExpiresAt = Date.now() + 7000; // ✅ exakt 7 Sekunden
                 }
             }
@@ -1657,7 +1657,7 @@
             // STATE RESET
             superFood = null;
             superFoodExpiresAt = 0;
-            extraFood = 0;
+            extraFood = null;
             extraFoodExpiresAt = 0;
             rainbowMode = false;
             rainbowExpiresAt = 0;
