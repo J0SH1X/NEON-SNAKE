@@ -1308,7 +1308,18 @@
 
         function gameloop() {
             if (gameOver) return;
-            direction = nextDirection;
+            if (inputQueue.length) {
+    const next = inputQueue.shift();
+
+    if (
+        (next === 'LEFT' && direction !== 'RIGHT') ||
+        (next === 'RIGHT' && direction !== 'LEFT') ||
+        (next === 'UP' && direction !== 'DOWN') ||
+        (next === 'DOWN' && direction !== 'UP')
+    ) {
+        direction = next;
+    }
+}
 
 
 
@@ -1611,70 +1622,66 @@
 
 
 
-        function keyDown(e) {
+let inputQueue = [];
 
-            // 🔓 Musik einmalig freischalten (Browser-Regel)
-            if (!musicUnlocked) {
-                bgMusic.play().then(() => {
-                    bgMusic.pause();
-                    bgMusic.currentTime = 0;
-                    musicUnlocked = true;
+function keyDown(e) {
+    if (gameOver && e.code === 'Space') {
+        restartGame();
+        return;
+    }
 
-                    // Musik direkt starten
-                    if (musicOn) {
-                        bgMusic.play();
-                    }
-                }).catch(() => { });
-            }
+    if (gameOver) return;
 
-            if (gameOver && e.code === 'Space') {
-                restartGame();
-                return;
-            }
+    const keyMap = {
+        ArrowLeft: 'LEFT',
+        ArrowUp: 'UP',
+        ArrowRight: 'RIGHT',
+        ArrowDown: 'DOWN'
+    };
 
-            if (gameOver) return;
+    const newDir = keyMap[e.key];
+    if (!newDir) return;
 
-            // 🎮 Steuerung
-            if (e.keyCode == 37 && direction !== 'RIGHT') nextDirection = 'LEFT';
-            if (e.keyCode == 38 && direction !== 'DOWN') nextDirection = 'UP';
-            if (e.keyCode == 39 && direction !== 'LEFT') nextDirection = 'RIGHT';
-            if (e.keyCode == 40 && direction !== 'UP') nextDirection = 'DOWN';
+        if (inputQueue.length < 2) {
+        inputQueue.push(newDir);
+    }
+}
 
-            // 🎵 Musik Pause / Resume mit M
-            if (e.key.toLowerCase() === 'm') {
-                musicOn = !musicOn;
+function handleSwipe() {
+    let dx = touchEndX - touchStartX;
+    let dy = touchEndY - touchStartY;
 
-                if (musicOn) {
-                    bgMusic.play();
-                } else {
-                    bgMusic.pause();
-                }
-            }
-        }
+    // Mindestbewegung (Deadzone)
+    if (Math.abs(dx) < 30 && Math.abs(dy) < 30) return;
 
-        function handleSwipe() {
-            let dx = touchEndX - touchStartX;
-            let dy = touchEndY - touchStartY;
+    let newDir = null;
 
-            // Mindestbewegung (Deadzone)
-            if (Math.abs(dx) < 30 && Math.abs(dy) < 30) return;
+    if (Math.abs(dx) > Math.abs(dy)) {
+        // Horizontal
+        if (dx > 0) newDir = 'RIGHT';
+        else newDir = 'LEFT';
+    } else {
+        // Vertikal
+        if (dy > 0) newDir = 'DOWN';
+        else newDir = 'UP';
+    }
 
-            if (Math.abs(dx) > Math.abs(dy)) {
-                // Horizontal
-                if (dx > 0 && direction !== 'LEFT') {
-                    nextDirection = 'RIGHT';
-                } else if (dx < 0 && direction !== 'RIGHT') {
-                    nextDirection = 'LEFT';
-                }
-            } else {
-                // Vertikal
-                if (dy > 0 && direction !== 'UP') {
-                    nextDirection = 'DOWN';
-                } else if (dy < 0 && direction !== 'DOWN') {
-                    nextDirection = 'UP';
-                }
-            }
-        }
+    if (!newDir) return;
+    const lastDir = inputQueue.length ? inputQueue[inputQueue.length - 1] : direction;
+
+    if (
+        (newDir === 'LEFT' && lastDir === 'RIGHT') ||
+        (newDir === 'RIGHT' && lastDir === 'LEFT') ||
+        (newDir === 'UP' && lastDir === 'DOWN') ||
+        (newDir === 'DOWN' && lastDir === 'UP')
+    ) {
+        return;
+    }
+
+    if (inputQueue.length < 2) {
+        inputQueue.push(newDir);
+    }
+}
 
         function restartGame() {
             clearInterval(gameInterval);
@@ -1720,7 +1727,7 @@
 
 
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('/NEON-SNAKE/sw.js');
+            navigator.serviceWorker.register('/sw.js');
         }
 
 
