@@ -54,6 +54,18 @@
             aspect-ratio: 1 / 1;
         }
 
+        body.desktop canvas {
+            max-width: 720px;
+        }
+
+        body.desktop #swipe-area {
+            display: none;
+        }
+
+        body.desktop .game-wrapper {
+            margin-top: 10px;
+        }
+
         /* 🏆 SCOREBOARD */
         .score-board {
             min-width: 200px;
@@ -1725,6 +1737,28 @@ function handleSwipe() {
             });
         }
 
+
+        function isDesktopDevice() {
+            const ua = navigator.userAgent || '';
+            const mobileRegex = /Mobi|Android|iPhone|iPad|iPod|Windows Phone|BlackBerry/i;
+            return !mobileRegex.test(ua) || window.matchMedia('(pointer:fine)').matches;
+        }
+
+        function applyDesktopLayout() {
+            if (!isDesktopDevice()) return;
+            document.body.classList.add('desktop');
+            const swipeArea = document.getElementById('swipe-area');
+            if (swipeArea) swipeArea.style.display = 'none';
+
+            const canvas = document.getElementById('canvas');
+            if (canvas) {
+                canvas.style.maxWidth = '720px';
+                canvas.style.width = '90vw';
+                canvas.style.height = '90vw';
+            }
+        }
+
+        window.addEventListener('load', applyDesktopLayout);
 
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('/sw.js');
